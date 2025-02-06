@@ -7,27 +7,48 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-2xl">
-        <div class="bg-white rounded-lg shadow-lg p-6">
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 md:p-8">
             <!-- Login Form -->
-            <div id="login-form" class="space-y-4">
-                <h2 class="text-2xl font-bold text-gray-800">Join Chat</h2>
-                <input type="text" id="username" placeholder="Username" class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <input type="text" id="room" placeholder="Room Name" class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <button onclick="joinRoom()" class="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200">Join</button>
+            <div id="login-form" class="space-y-4 max-w-md mx-auto">
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 text-center mb-6">Join Chat</h2>
+                <div class="space-y-3">
+                    <input type="text" id="username" placeholder="Username" 
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                    <input type="text" id="room" placeholder="Room Name" 
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                    <button onclick="joinRoom()" 
+                            class="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition duration-200 font-medium text-lg">
+                        Join
+                    </button>
+                </div>
             </div>
 
             <!-- Chat Interface -->
             <div id="chat-interface" class="hidden space-y-4">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-2xl font-bold text-gray-800">Chat Room: <span id="room-display"></span></h2>
-                    <button onclick="leaveRoom()" class="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition duration-200">Leave</button>
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+                    <div class="flex items-center space-x-2">
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800">Room:</h2>
+                        <span id="room-display" class="text-xl sm:text-2xl text-blue-600 font-semibold"></span>
+                    </div>
+                    <button onclick="leaveRoom()" 
+                            class="bg-red-500 text-white py-2 px-6 rounded-lg hover:bg-red-600 transition duration-200 text-sm sm:text-base font-medium">
+                        Leave Room
+                    </button>
                 </div>
-                <div id="messages" class="h-96 overflow-y-auto border rounded p-4 space-y-2"></div>
-                <div class="flex space-x-2">
-                    <input type="text" id="message" placeholder="Type your message..." class="flex-1 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    <button onclick="sendMessage()" class="bg-blue-500 text-white py-2 px-6 rounded hover:bg-blue-600 transition duration-200">Send</button>
+                
+                <div id="messages" class="h-[60vh] sm:h-[65vh] overflow-y-auto border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                    <!-- Messages will be inserted here -->
+                </div>
+                
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" id="message" placeholder="Type your message..." 
+                           class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                    <button onclick="sendMessage()" 
+                            class="w-full sm:w-auto bg-blue-500 text-white py-3 px-8 rounded-lg hover:bg-blue-600 transition duration-200 font-medium">
+                        Send
+                    </button>
                 </div>
             </div>
         </div>
@@ -47,6 +68,8 @@
                 document.getElementById('login-form').classList.add('hidden');
                 document.getElementById('chat-interface').classList.remove('hidden');
                 document.getElementById('room-display').textContent = currentRoom;
+            } else {
+                alert('Please enter both username and room name');
             }
         }
 
@@ -55,6 +78,8 @@
             document.getElementById('login-form').classList.remove('hidden');
             document.getElementById('chat-interface').classList.add('hidden');
             document.getElementById('messages').innerHTML = '';
+            document.getElementById('username').value = currentUsername;
+            document.getElementById('room').value = '';
             currentUsername = '';
             currentRoom = '';
         }
@@ -80,12 +105,23 @@
             const messagesDiv = document.getElementById('messages');
             const messageElement = document.createElement('div');
             const isSystem = data.user === 'System';
+            const isCurrentUser = data.user === currentUsername;
             
-            messageElement.className = isSystem ? 'text-gray-500 text-sm' : 'bg-gray-100 p-2 rounded';
-            messageElement.innerHTML = `
-                ${isSystem ? '' : `<span class="font-bold text-blue-600">${data.user}:</span> `}
-                ${data.message}
-            `;
+            messageElement.className = isSystem 
+                ? 'text-center text-gray-500 text-sm py-1' 
+                : `flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`;
+            
+            if (isSystem) {
+                messageElement.innerHTML = data.message;
+            } else {
+                messageElement.innerHTML = `
+                    <div class="${isCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} 
+                                rounded-lg py-2 px-4 max-w-[80%] break-words">
+                        ${isCurrentUser ? '' : `<span class="font-semibold text-sm block">${data.user}</span>`}
+                        <span class="block">${data.message}</span>
+                    </div>
+                `;
+            }
             
             messagesDiv.appendChild(messageElement);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
