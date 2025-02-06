@@ -46,4 +46,8 @@ if __name__ == '__main__':
     # Get port from environment variable or default to 5000
     port = int(os.environ.get('PORT', 5000))
     # In production, we need to listen on all interfaces
-    socketio.run(app, host='0.0.0.0', port=port, debug=True)
+    socketio.run(app, 
+                 host='0.0.0.0', 
+                 port=port, 
+                 debug=False,  # Disable debug mode in production
+                 allow_unsafe_werkzeug=True)  # Allow Werkzeug in production
