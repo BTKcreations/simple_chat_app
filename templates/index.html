@@ -58,16 +58,131 @@
         const socket = io();
         let currentUsername = '';
         let currentRoom = '';
-
-        function joinRoom() {
-            currentUsername = document.getElementById('username').value.trim();
-            currentRoom = document.getElementById('room').value.trim();
+        
+        // Local Storage Keys
+        const STORAGE_KEY = 'chatApp';
+        const EXPIRY_KEY = 'chatAppExpiry';
+        
+        // Initialize from localStorage if exists
+        function initFromStorage() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            const expiry = localStorage.getItem(EXPIRY_KEY);
             
-            if (currentUsername && currentRoom) {
-                socket.emit('join', { username: currentUsername, room: currentRoom });
+            if (stored && expiry) {
+                const now = new Date().getTime();
+                if (now < parseInt(expiry)) {
+                    const data = JSON.parse(stored);
+                    if (data.username && data.room) {
+                        document.getElementById('username').value = data.username;
+                        document.getElementById('room').value = data.room;
+                        joinRoom(true); // true means joining from storage
+                        
+                        // Restore messages
+                        if (data.messages) {
+                            const messagesDiv = document.getElementById('messages');
+                            data.messages.forEach(msg => {
+                                displayMessage(msg);
+                            });
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        }
+                    }
+                } else {
+                    // Clear expired data
+                    localStorage.removeItem(STORAGE_KEY);
+                    localStorage.removeItem(EXPIRY_KEY);
+                }
+            }
+        }
+        
+        // Save to localStorage with 24-hour expiry
+        function saveToStorage() {
+            const data = {
+                username: currentUsername,
+                room: currentRoom,
+                messages: getStoredMessages()
+            };
+            
+            const now = new Date().getTime();
+            const expiryTime = now + (24 * 60 * 60 * 1000); // 24 hours from now
+            
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            localStorage.setItem(EXPIRY_KEY, expiryTime.toString());
+        }
+        
+        // Get stored messages from the messages div
+        function getStoredMessages() {
+            const messages = [];
+            const messagesDiv = document.getElementById('messages');
+            const messageElements = messagesDiv.children;
+            
+            for (let element of messageElements) {
+                const isSystem = element.classList.contains('text-center');
+                messages.push({
+                    html: element.outerHTML,
+                    isSystem: isSystem
+                });
+            }
+            
+            return messages;
+        }
+        
+        // Display a message (either new or from storage)
+        function displayMessage(data) {
+            const messagesDiv = document.getElementById('messages');
+            
+            if (data.html) {
+                // Message from storage
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = data.html;
+                messagesDiv.appendChild(tempDiv.firstChild);
+            } else {
+                // New message
+                const messageElement = document.createElement('div');
+                const isSystem = data.user === 'System';
+                const isCurrentUser = data.user === currentUsername;
+                
+                messageElement.className = isSystem 
+                    ? 'text-center text-gray-500 text-sm py-1' 
+                    : `flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`;
+                
+                if (isSystem) {
+                    messageElement.innerHTML = data.message;
+                } else {
+                    const timestamp = new Date().toLocaleTimeString();
+                    messageElement.innerHTML = `
+                        <div class="${isCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} 
+                                    rounded-lg py-2 px-4 max-w-[80%] break-words">
+                            ${isCurrentUser ? '' : `<span class="font-semibold text-sm block">${data.user}</span>`}
+                            <span class="block">${data.message}</span>
+                            <span class="text-xs ${isCurrentUser ? 'text-blue-100' : 'text-gray-500'} block text-right">${timestamp}</span>
+                        </div>
+                    `;
+                }
+                
+                messagesDiv.appendChild(messageElement);
+            }
+            
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            saveToStorage();
+        }
+
+        function joinRoom(fromStorage = false) {
+            const usernameInput = document.getElementById('username').value.trim();
+            const roomInput = document.getElementById('room').value.trim();
+            
+            if (usernameInput && roomInput) {
+                currentUsername = usernameInput;
+                currentRoom = roomInput;
+                
+                if (!fromStorage) {
+                    socket.emit('join', { username: currentUsername, room: currentRoom });
+                }
+                
                 document.getElementById('login-form').classList.add('hidden');
                 document.getElementById('chat-interface').classList.remove('hidden');
                 document.getElementById('room-display').textContent = currentRoom;
+                
+                saveToStorage();
             } else {
                 alert('Please enter both username and room name');
             }
@@ -80,6 +195,10 @@
             document.getElementById('messages').innerHTML = '';
             document.getElementById('username').value = currentUsername;
             document.getElementById('room').value = '';
+            
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(EXPIRY_KEY);
+            
             currentUsername = '';
             currentRoom = '';
         }
@@ -101,31 +220,20 @@
             }
         });
 
-        socket.on('message', function(data) {
-            const messagesDiv = document.getElementById('messages');
-            const messageElement = document.createElement('div');
-            const isSystem = data.user === 'System';
-            const isCurrentUser = data.user === currentUsername;
-            
-            messageElement.className = isSystem 
-                ? 'text-center text-gray-500 text-sm py-1' 
-                : `flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`;
-            
-            if (isSystem) {
-                messageElement.innerHTML = data.message;
-            } else {
-                messageElement.innerHTML = `
-                    <div class="${isCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} 
-                                rounded-lg py-2 px-4 max-w-[80%] break-words">
-                        ${isCurrentUser ? '' : `<span class="font-semibold text-sm block">${data.user}</span>`}
-                        <span class="block">${data.message}</span>
-                    </div>
-                `;
+        // Prevent accidental page reload
+        window.addEventListener('beforeunload', function(e) {
+            if (currentUsername && currentRoom) {
+                e.preventDefault();
+                e.returnValue = '';
             }
-            
-            messagesDiv.appendChild(messageElement);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
+
+        socket.on('message', function(data) {
+            displayMessage(data);
+        });
+
+        // Initialize from storage when page loads
+        document.addEventListener('DOMContentLoaded', initFromStorage);
     </script>
 </body>
 </html>
