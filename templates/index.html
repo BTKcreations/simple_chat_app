@@ -18,6 +18,9 @@
                            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
                     <input type="text" id="room" placeholder="Room Name" 
                            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                    <div id="recent-rooms" class="space-y-2">
+                        <!-- Recent rooms will be listed here -->
+                    </div>
                     <button onclick="joinRoom()" 
                             class="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition duration-200 font-medium text-lg">
                         Join
@@ -60,113 +63,104 @@
         let currentRoom = '';
         
         // Local Storage Keys
-        const STORAGE_KEY = 'chatApp';
-        const EXPIRY_KEY = 'chatAppExpiry';
+        const ROOMS_KEY = 'chatRooms';
+        const USERNAME_KEY = 'chatUsername';
         
-        // Initialize from localStorage if exists
-        function initFromStorage() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            const expiry = localStorage.getItem(EXPIRY_KEY);
-            
-            if (stored && expiry) {
-                const now = new Date().getTime();
-                if (now < parseInt(expiry)) {
-                    const data = JSON.parse(stored);
-                    if (data.username && data.room) {
-                        document.getElementById('username').value = data.username;
-                        document.getElementById('room').value = data.room;
-                        joinRoom(true); // true means joining from storage
-                        
-                        // Restore messages
-                        if (data.messages) {
-                            const messagesDiv = document.getElementById('messages');
-                            data.messages.forEach(msg => {
-                                displayMessage(msg);
-                            });
-                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                        }
-                    }
-                } else {
-                    // Clear expired data
-                    localStorage.removeItem(STORAGE_KEY);
-                    localStorage.removeItem(EXPIRY_KEY);
-                }
+        // Initialize chat rooms storage if not exists
+        function initializeStorage() {
+            if (!localStorage.getItem(ROOMS_KEY)) {
+                localStorage.setItem(ROOMS_KEY, JSON.stringify({}));
             }
+            
+            // Restore last used username
+            const savedUsername = localStorage.getItem(USERNAME_KEY);
+            if (savedUsername) {
+                document.getElementById('username').value = savedUsername;
+            }
+            
+            updateRecentRoomsList();
         }
         
-        // Save to localStorage with 24-hour expiry
-        function saveToStorage() {
-            const data = {
-                username: currentUsername,
-                room: currentRoom,
-                messages: getStoredMessages()
-            };
+        // Update the list of recent rooms
+        function updateRecentRoomsList() {
+            const rooms = JSON.parse(localStorage.getItem(ROOMS_KEY));
+            const recentRoomsDiv = document.getElementById('recent-rooms');
+            recentRoomsDiv.innerHTML = '';
             
-            const now = new Date().getTime();
-            const expiryTime = now + (24 * 60 * 60 * 1000); // 24 hours from now
-            
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            localStorage.setItem(EXPIRY_KEY, expiryTime.toString());
+            Object.keys(rooms).forEach(roomName => {
+                const roomDiv = document.createElement('div');
+                roomDiv.className = 'flex justify-between items-center bg-gray-50 p-2 rounded-lg';
+                roomDiv.innerHTML = `
+                    <span class="text-gray-700">${roomName}</span>
+                    <button onclick="joinExistingRoom('${roomName}')" 
+                            class="text-blue-500 hover:text-blue-600 text-sm font-medium">
+                        Rejoin
+                    </button>
+                `;
+                recentRoomsDiv.appendChild(roomDiv);
+            });
         }
         
-        // Get stored messages from the messages div
-        function getStoredMessages() {
-            const messages = [];
+        // Join an existing room
+        function joinExistingRoom(roomName) {
+            document.getElementById('room').value = roomName;
+            joinRoom();
+        }
+        
+        // Save message to room history
+        function saveMessageToRoom(message) {
+            const rooms = JSON.parse(localStorage.getItem(ROOMS_KEY));
+            if (!rooms[currentRoom]) {
+                rooms[currentRoom] = [];
+            }
+            rooms[currentRoom].push(message);
+            localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
+        }
+        
+        // Load messages for a room
+        function loadRoomMessages(roomName) {
+            const rooms = JSON.parse(localStorage.getItem(ROOMS_KEY));
+            return rooms[roomName] || [];
+        }
+        
+        // Display a message
+        function displayMessage(data, skipStorage = false) {
             const messagesDiv = document.getElementById('messages');
-            const messageElements = messagesDiv.children;
+            const messageElement = document.createElement('div');
+            const isSystem = data.user === 'System';
+            const isCurrentUser = data.user === currentUsername;
             
-            for (let element of messageElements) {
-                const isSystem = element.classList.contains('text-center');
-                messages.push({
-                    html: element.outerHTML,
-                    isSystem: isSystem
+            messageElement.className = isSystem 
+                ? 'text-center text-gray-500 text-sm py-1' 
+                : `flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`;
+            
+            if (isSystem) {
+                messageElement.innerHTML = data.message;
+            } else {
+                const timestamp = data.timestamp || new Date().toLocaleTimeString();
+                messageElement.innerHTML = `
+                    <div class="${isCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} 
+                                rounded-lg py-2 px-4 max-w-[80%] break-words">
+                        ${isCurrentUser ? '' : `<span class="font-semibold text-sm block">${data.user}</span>`}
+                        <span class="block">${data.message}</span>
+                        <span class="text-xs ${isCurrentUser ? 'text-blue-100' : 'text-gray-500'} block text-right">${timestamp}</span>
+                    </div>
+                `;
+            }
+            
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            if (!skipStorage && !isSystem) {
+                saveMessageToRoom({
+                    user: data.user,
+                    message: data.message,
+                    timestamp: data.timestamp || new Date().toLocaleTimeString()
                 });
             }
-            
-            return messages;
-        }
-        
-        // Display a message (either new or from storage)
-        function displayMessage(data) {
-            const messagesDiv = document.getElementById('messages');
-            
-            if (data.html) {
-                // Message from storage
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = data.html;
-                messagesDiv.appendChild(tempDiv.firstChild);
-            } else {
-                // New message
-                const messageElement = document.createElement('div');
-                const isSystem = data.user === 'System';
-                const isCurrentUser = data.user === currentUsername;
-                
-                messageElement.className = isSystem 
-                    ? 'text-center text-gray-500 text-sm py-1' 
-                    : `flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`;
-                
-                if (isSystem) {
-                    messageElement.innerHTML = data.message;
-                } else {
-                    const timestamp = new Date().toLocaleTimeString();
-                    messageElement.innerHTML = `
-                        <div class="${isCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} 
-                                    rounded-lg py-2 px-4 max-w-[80%] break-words">
-                            ${isCurrentUser ? '' : `<span class="font-semibold text-sm block">${data.user}</span>`}
-                            <span class="block">${data.message}</span>
-                            <span class="text-xs ${isCurrentUser ? 'text-blue-100' : 'text-gray-500'} block text-right">${timestamp}</span>
-                        </div>
-                    `;
-                }
-                
-                messagesDiv.appendChild(messageElement);
-            }
-            
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            saveToStorage();
         }
 
-        function joinRoom(fromStorage = false) {
+        function joinRoom() {
             const usernameInput = document.getElementById('username').value.trim();
             const roomInput = document.getElementById('room').value.trim();
             
@@ -174,15 +168,22 @@
                 currentUsername = usernameInput;
                 currentRoom = roomInput;
                 
-                if (!fromStorage) {
-                    socket.emit('join', { username: currentUsername, room: currentRoom });
-                }
+                // Save username
+                localStorage.setItem(USERNAME_KEY, currentUsername);
+                
+                // Load existing messages
+                const messages = loadRoomMessages(currentRoom);
+                document.getElementById('messages').innerHTML = '';
+                messages.forEach(msg => displayMessage(msg, true));
+                
+                // Join socket room
+                socket.emit('join', { username: currentUsername, room: currentRoom });
                 
                 document.getElementById('login-form').classList.add('hidden');
                 document.getElementById('chat-interface').classList.remove('hidden');
                 document.getElementById('room-display').textContent = currentRoom;
                 
-                saveToStorage();
+                updateRecentRoomsList();
             } else {
                 alert('Please enter both username and room name');
             }
@@ -193,14 +194,10 @@
             document.getElementById('login-form').classList.remove('hidden');
             document.getElementById('chat-interface').classList.add('hidden');
             document.getElementById('messages').innerHTML = '';
-            document.getElementById('username').value = currentUsername;
             document.getElementById('room').value = '';
             
-            localStorage.removeItem(STORAGE_KEY);
-            localStorage.removeItem(EXPIRY_KEY);
-            
-            currentUsername = '';
             currentRoom = '';
+            updateRecentRoomsList();
         }
 
         function sendMessage() {
@@ -208,6 +205,11 @@
             const message = messageInput.value.trim();
             
             if (message) {
+                const messageData = {
+                    username: currentUsername,
+                    message: message,
+                    timestamp: new Date().toLocaleTimeString()
+                };
                 socket.emit('message', { username: currentUsername, message: message });
                 messageInput.value = '';
             }
@@ -232,8 +234,8 @@
             displayMessage(data);
         });
 
-        // Initialize from storage when page loads
-        document.addEventListener('DOMContentLoaded', initFromStorage);
+        // Initialize storage and recent rooms list when page loads
+        document.addEventListener('DOMContentLoaded', initializeStorage);
     </script>
 </body>
 </html>
