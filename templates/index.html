@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chat App</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-2xl">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <!-- Login Form -->
+            <div id="login-form" class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-800">Join Chat</h2>
+                <input type="text" id="username" placeholder="Username" class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <input type="text" id="room" placeholder="Room Name" class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <button onclick="joinRoom()" class="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition duration-200">Join</button>
+            </div>
+
+            <!-- Chat Interface -->
+            <div id="chat-interface" class="hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-bold text-gray-800">Chat Room: <span id="room-display"></span></h2>
+                    <button onclick="leaveRoom()" class="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition duration-200">Leave</button>
+                </div>
+                <div id="messages" class="h-96 overflow-y-auto border rounded p-4 space-y-2"></div>
+                <div class="flex space-x-2">
+                    <input type="text" id="message" placeholder="Type your message..." class="flex-1 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <button onclick="sendMessage()" class="bg-blue-500 text-white py-2 px-6 rounded hover:bg-blue-600 transition duration-200">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUsername = '';
+        let currentRoom = '';
+
+        function joinRoom() {
+            currentUsername = document.getElementById('username').value.trim();
+            currentRoom = document.getElementById('room').value.trim();
+            
+            if (currentUsername && currentRoom) {
+                socket.emit('join', { username: currentUsername, room: currentRoom });
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('chat-interface').classList.remove('hidden');
+                document.getElementById('room-display').textContent = currentRoom;
+            }
+        }
+
+        function leaveRoom() {
+            socket.emit('leave', { username: currentUsername });
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('chat-interface').classList.add('hidden');
+            document.getElementById('messages').innerHTML = '';
+            currentUsername = '';
+            currentRoom = '';
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('message');
+            const message = messageInput.value.trim();
+            
+            if (message) {
+                socket.emit('message', { username: currentUsername, message: message });
+                messageInput.value = '';
+            }
+        }
+
+        // Handle Enter key
+        document.getElementById('message').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        socket.on('message', function(data) {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            const isSystem = data.user === 'System';
+            
+            messageElement.className = isSystem ? 'text-gray-500 text-sm' : 'bg-gray-100 p-2 rounded';
+            messageElement.innerHTML = `
+                ${isSystem ? '' : `<span class="font-bold text-blue-600">${data.user}:</span> `}
+                ${data.message}
+            `;
+            
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+    </script>
+</body>
+</html>
