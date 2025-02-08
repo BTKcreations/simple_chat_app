@@ -1,10 +1,13 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, url_for
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import os
 
 app = Flask(__name__, static_folder='static')
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, async_mode='threading')  # Use threading mode instead of eventlet
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 # Store active users and their rooms
 users = {}
@@ -72,8 +75,7 @@ def create_app():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    if os.environ.get('ENVIRONMENT') == 'production':
-        from waitress import serve
-        serve(app, host='0.0.0.0', port=port)
-    else:
-        socketio.run(app, host='0.0.0.0', port=port, debug=False)
+    socketio.run(app, 
+                host='0.0.0.0',
+                port=port,
+                debug=False)
