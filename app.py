@@ -1,7 +1,7 @@
 import eventlet
 eventlet.monkey_patch()
 
-from flask import Flask, render_template, url_for
+from flask import Flask, render_template, url_for, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import os
 
@@ -17,6 +17,30 @@ rooms = {}
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/rooms')
+def rooms():
+    room_details = []
+    for room_name, members in rooms.items():
+        room_details.append({
+            'name': room_name,
+            'creator': 'username_placeholder',  # Replace with actual creator logic
+            'timestamp': '2025-02-08T23:59:06+05:30',  # Replace with actual timestamp logic
+            'members': list(members)
+        })
+    return render_template('rooms.html', rooms=room_details)
+
+@app.route('/rooms/details')
+def room_details():
+    room_details = []
+    for room_name, members in rooms.items():
+        room_details.append({
+            'name': room_name,
+            'creator': 'username_placeholder',  # Replace with actual creator logic
+            'timestamp': '2025-02-08T23:59:06+05:30',  # Replace with actual timestamp logic
+            'members': list(members)
+        })
+    return jsonify(room_details)
 
 @socketio.on('connect')
 def handle_connect():

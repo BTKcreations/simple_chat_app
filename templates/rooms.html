@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rooms</title>
+    <link rel="stylesheet" href="/static/styles.css"> <!-- Link to your CSS file -->
+</head>
+<body>
+    <h1>Rooms</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Room Name</th>
+                <th>Creator</th>
+                <th>Timestamp</th>
+                <th>Members</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for room in rooms %}
+            <tr>
+                <td>{{ room.name }}</td>
+                <td>{{ room.creator }}</td>
+                <td>{{ room.timestamp }}</td>
+                <td>{{ room.members | join(', ') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
