@@ -4,6 +4,7 @@ eventlet.monkey_patch()
 from flask import Flask, render_template, url_for, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import os
+from datetime import datetime
 
 app = Flask(__name__, static_folder='static')
 app.config['SECRET_KEY'] = 'secret!'
@@ -19,13 +20,15 @@ def index():
     return render_template('index.html')
 
 @app.route('/rooms')
-def rooms():
+def get_rooms():
+    print("Reached the rooms route")
+    print("rooms    : "+str(rooms))
     room_details = []
     for room_name, members in rooms.items():
         room_details.append({
             'name': room_name,
-            'creator': 'username_placeholder',  # Replace with actual creator logic
-            'timestamp': '2025-02-08T23:59:06+05:30',  # Replace with actual timestamp logic
+            'creator': list(rooms[room_name])[0],  # Replace with actual creator logic
+            'timestamp': min((users[member]['join_time'] for member in members), default=datetime.min).strftime('%Y-%m-%d %H:%M:%S'),
             'members': list(members)
         })
     return render_template('rooms.html', rooms=room_details)
@@ -51,7 +54,8 @@ def handle_join(data):
     username = data['username']
     room = data['room']
     join_room(room)
-    users[username] = room
+    current_time = datetime.now()
+    users[username] = {'room': room, 'join_time': current_time}
     
     # Initialize room if not exists
     if room not in rooms:

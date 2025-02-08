@@ -5,28 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rooms</title>
     <link rel="stylesheet" href="/static/styles.css"> <!-- Link to your CSS file -->
+    <!-- <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script> Include Socket.IO client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script src="https://cdn.tailwindcss.com"></script> <!-- Include Tailwind CSS -->
 </head>
 <body>
-    <h1>Rooms</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>Room Name</th>
-                <th>Creator</th>
-                <th>Timestamp</th>
-                <th>Members</th>
+    <h1 class="text-3xl font-bold underline">Rooms</h1>
+    <table class="min-w-full bg-white border border-gray-300">
+        <thead class="bg-gray-100">
+            <tr class="text-sm font-medium text-gray-700">
+                <th class="py-2">Room Name</th>
+                <th class="py-2">Creator</th>
+                <th class="py-2">Timestamp</th>
+                <th class="py-2">Members</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody class="bg-white">
             {% for room in rooms %}
             <tr>
-                <td>{{ room.name }}</td>
-                <td>{{ room.creator }}</td>
-                <td>{{ room.timestamp }}</td>
-                <td>{{ room.members | join(', ') }}</td>
+                <td class="py-2 border-b">{{ room.name }}</td>
+                <td class="py-2 border-b">{{ room.creator }}</td>
+                <td class="py-2 border-b">{{ room.timestamp }}</td>
+                <td class="py-2 border-b">
+                    <select id="members-{{ room.name }}" class="w-full">
+                        {% for member in room.members %}
+                        <option value="{{ member }}">{{ member }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+
+    <script>
+        const socket = io(); // Initialize Socket.IO
+
+        // Listen for room updates
+        socket.on('room_update', function(data) {
+            const membersDropdown = document.getElementById('members-' + data.room);
+            membersDropdown.innerHTML = ''; // Clear existing options
+            data.members.forEach(function(member) {
+                const option = document.createElement('option');
+                option.value = member;
+                option.textContent = member;
+                membersDropdown.appendChild(option);
+            });
+        });
+    </script>
 </body>
 </html>
