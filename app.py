@@ -54,8 +54,7 @@ def handle_join(data):
     username = data['username']
     room = data['room']
     join_room(room)
-    current_time = datetime.now()
-    users[username] = {'room': room, 'join_time': current_time}
+    users[username] = room
     
     # Initialize room if not exists
     if room not in rooms:
