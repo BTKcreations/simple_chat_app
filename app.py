@@ -8,6 +8,8 @@ socketio = SocketIO(app)
 
 # Store active users and their rooms
 users = {}
+# Store room information
+rooms = {}
 
 @app.route('/')
 def index():
@@ -23,6 +25,18 @@ def handle_join(data):
     room = data['room']
     join_room(room)
     users[username] = room
+    
+    # Initialize room if not exists
+    if room not in rooms:
+        rooms[room] = set()
+    rooms[room].add(username)
+    
+    # Emit room update to all users in the room
+    room_data = {
+        'members': list(rooms[room]),
+        'count': len(rooms[room])
+    }
+    emit('room_update', room_data, room=room)
     emit('message', {'user': 'System', 'message': f'{username} has joined the room {room}'}, room=room)
 
 @socketio.on('leave')
@@ -32,6 +46,17 @@ def handle_leave(data):
     if room:
         leave_room(room)
         del users[username]
+        if room in rooms:
+            rooms[room].discard(username)
+            if len(rooms[room]) == 0:
+                del rooms[room]
+            else:
+                # Emit room update to remaining users
+                room_data = {
+                    'members': list(rooms[room]),
+                    'count': len(rooms[room])
+                }
+                emit('room_update', room_data, room=room)
         emit('message', {'user': 'System', 'message': f'{username} has left the room'}, room=room)
 
 @socketio.on('message')
@@ -43,11 +68,5 @@ def handle_message(data):
         emit('message', {'user': username, 'message': message}, room=room)
 
 if __name__ == '__main__':
-    # Get port from environment variable or default to 5000
     port = int(os.environ.get('PORT', 5000))
-    # In production, we need to listen on all interfaces
-    socketio.run(app, 
-                 host='0.0.0.0', 
-                 port=port, 
-                 debug=False,  # Disable debug mode in production
-                 allow_unsafe_werkzeug=True)  # Allow Werkzeug in production
+    socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True)
