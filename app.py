@@ -4,7 +4,7 @@ import os
 
 app = Flask(__name__, static_folder='static')
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode='threading')  # Use threading mode instead of eventlet
 
 # Store active users and their rooms
 users = {}
@@ -67,6 +67,13 @@ def handle_message(data):
     if room:
         emit('message', {'user': username, 'message': message}, room=room)
 
+def create_app():
+    return app
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True)
+    if os.environ.get('ENVIRONMENT') == 'production':
+        from waitress import serve
+        serve(app, host='0.0.0.0', port=port)
+    else:
+        socketio.run(app, host='0.0.0.0', port=port, debug=False)
