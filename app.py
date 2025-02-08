@@ -28,7 +28,7 @@ def get_rooms():
         room_details.append({
             'name': room_name,
             'creator': list(rooms[room_name])[0],  # Replace with actual creator logic
-            'timestamp': min((users[member]['join_time'] for member in members), default=datetime.min).strftime('%Y-%m-%d %H:%M:%S'),
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'members': list(members)
         })
     return render_template('rooms.html', rooms=room_details)
